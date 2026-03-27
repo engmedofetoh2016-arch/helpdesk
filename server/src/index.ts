@@ -70,12 +70,19 @@ Sentry.setupExpressErrorHandler(app);
 // In production, serve the built React client as static files
 if (isProduction) {
   const clientDist = path.resolve(import.meta.dirname, "../../client/dist");
+
+  const sendIndex = (_req: express.Request, res: express.Response) => {
+    res.sendFile(path.join(clientDist, "index.html"));
+  };
+
   app.use(express.static(clientDist));
 
-  // SPA fallback: serve index.html for any non-API route
-  app.get("/{*path}", (_req, res) => {
-    res.sendFile(path.join(clientDist, "index.html"));
-  });
+  // Root must be explicit: Express 5's "/{*path}" does not match "/" alone.
+  app.get("/", sendIndex);
+  // SPA fallback for client-side routes (e.g. /login, /tickets/1)
+  app.get("/{*path}", sendIndex);
+
+  console.log(`Serving static assets from ${clientDist}`);
 }
 
 if (!process.env.WEBHOOK_SECRET) {
