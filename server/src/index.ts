@@ -22,8 +22,13 @@ if (!process.env.BETTER_AUTH_SECRET) {
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Coolify / Traefik set X-Forwarded-Proto; required for req.secure, cookies, redirects.
+app.set("trust proxy", 1);
+
 // Default Helmet CSP uses script-src 'self' only; our Vite-built index.html
 // includes a small inline script (theme from localStorage) — see client/index.html.
+// COOP / Origin-Agent-Cluster are ignored or noisy on non-HTTPS origins (e.g. http://*.sslip.io);
+// disable so preview URLs and real HTTPS both behave without browser warnings.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -38,6 +43,8 @@ app.use(
         "font-src": ["'self'", "https://fonts.gstatic.com"],
       },
     },
+    crossOriginOpenerPolicy: false,
+    originAgentCluster: false,
   })
 );
 app.use(
