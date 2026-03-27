@@ -2,10 +2,16 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/require-auth";
 import { validate } from "../lib/validate";
 import { parseId } from "../lib/parse-id";
-import { ticketListQuerySchema, updateTicketSchema } from "core/schemas/tickets.ts";
+import {
+  createTicketSchema,
+  ticketListQuerySchema,
+  updateTicketSchema,
+} from "core/schemas/tickets.ts";
 import prisma from "../db";
 import type { Prisma } from "../generated/prisma/client";
 import { AI_AGENT_ID } from "core/constants/ai-agent.ts";
+import { sendClassifyJob } from "../lib/classify-ticket";
+import { sendAutoResolveJob } from "../lib/auto-resolve-ticket";
 
 interface TicketStatsRow {
   totalTickets: bigint;
@@ -60,6 +66,48 @@ router.get("/stats/daily-volume", requireAuth, async (_req, res) => {
   res.json({ data });
 });
 
+function stripSubjectPrefixes(subject: string): string {
+  return subject.replace(/^(Re:\s*|Fwd:\s*)+/i, "").trim();
+}
+
+router.get("/customers", requireAuth, async (_req, res) => {
+  const rows = await prisma.ticket.findMany({
+    distinct: ["senderEmail"],
+    select: { senderEmail: true, senderName: true },
+    orderBy: { senderEmail: "asc" },
+  });
+
+  res.json({ customers: rows });
+});
+
+router.post("/", requireAuth, async (req, res) => {
+  const data = validate(createTicketSchema, req.body, res);
+  if (!data) return;
+
+  const subject = stripSubjectPrefixes(data.subject);
+
+  const ticket = await prisma.ticket.create({
+    data: {
+      subject,
+      body: data.body,
+      bodyHtml: data.bodyHtml ?? null,
+      senderName: data.senderName,
+      senderEmail: data.senderEmail,
+      assignedToId: AI_AGENT_ID,
+    },
+  });
+
+  res.status(201).json(ticket);
+
+  sendClassifyJob(ticket).catch((error) =>
+    console.error(`Failed to enqueue classify job for ticket ${ticket.id}:`, error)
+  );
+
+  sendAutoResolveJob(ticket).catch((error) =>
+    console.error(`Failed to enqueue auto-resolve job for ticket ${ticket.id}:`, error)
+  );
+});
+
 router.get("/", requireAuth, async (req, res) => {
   const query = validate(ticketListQuerySchema, req.query, res);
   if (!query) return;
@@ -68,8 +116,10 @@ router.get("/", requireAuth, async (req, res) => {
 
   if (query.status) {
     where.status = query.status;
-  } else {
-    where.status = { in: ["open", "resolved", "closed"] };
+  }
+
+  if (query.senderEmail) {
+    where.senderEmail = query.senderEmail;
   }
 
   if (query.category) {

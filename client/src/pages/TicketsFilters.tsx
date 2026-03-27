@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { agentTicketStatuses, statusLabel } from "core/constants/ticket-status.ts";
+import { ticketStatuses, statusLabel } from "core/constants/ticket-status.ts";
 import type { TicketFilters } from "./TicketsPage";
 
 const ALL = "__all__";
@@ -15,23 +15,52 @@ const ALL = "__all__";
 interface TicketsFiltersProps {
   filters: TicketFilters;
   onChange: (filters: TicketFilters) => void;
+  customers: { senderEmail: string; senderName: string }[];
+  customersLoading: boolean;
 }
 
 export default function TicketsFilters({
   filters,
   onChange,
+  customers,
+  customersLoading,
 }: TicketsFiltersProps) {
   return (
-    <div className="flex items-center gap-4 mb-4">
-      <div className="relative flex-1 max-w-sm">
+    <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center mb-4">
+      <div className="relative flex-1 min-w-[200px] max-w-sm">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search tickets..."
+          placeholder="Search subject, name, or email..."
           value={filters.search ?? ""}
           onChange={(e) => onChange({ ...filters, search: e.target.value || undefined })}
           className="pl-8"
         />
       </div>
+
+      <Select
+        value={filters.senderEmail ?? ALL}
+        onValueChange={(value) =>
+          onChange({
+            ...filters,
+            senderEmail: value === ALL ? undefined : value,
+          })
+        }
+        disabled={customersLoading}
+      >
+        <SelectTrigger className="w-[min(100%,280px)] sm:w-[260px]">
+          <SelectValue placeholder="All customers" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>All customers</SelectItem>
+          {customers.map((c) => (
+            <SelectItem key={c.senderEmail} value={c.senderEmail}>
+              <span className="truncate block max-w-[240px]">
+                {c.senderName} ({c.senderEmail})
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       <Select
         value={filters.status ?? ALL}
@@ -44,7 +73,7 @@ export default function TicketsFilters({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>All statuses</SelectItem>
-          {agentTicketStatuses.map((s) => (
+          {ticketStatuses.map((s) => (
             <SelectItem key={s} value={s}>
               {statusLabel[s]}
             </SelectItem>

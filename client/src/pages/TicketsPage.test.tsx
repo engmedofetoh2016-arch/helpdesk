@@ -43,13 +43,38 @@ function mockResponse(tickets = mockTickets, total = tickets.length) {
   return { data: { tickets, total, page: 1, pageSize: 10 } };
 }
 
+function mockCustomers() {
+  return { data: { customers: [] } };
+}
+
+function defaultGetImpl(
+  ticketsHandler: () => Promise<{ data: unknown }> = () =>
+    Promise.resolve(mockResponse())
+) {
+  return (url: string) => {
+    if (url.includes("/customers")) {
+      return Promise.resolve(mockCustomers());
+    }
+    if (url === "/api/tickets") {
+      return ticketsHandler();
+    }
+    return Promise.reject(new Error(`Unexpected GET ${url}`));
+  };
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
+  mockedAxios.get.mockImplementation(defaultGetImpl());
 });
 
 describe("TicketsPage", () => {
   it("should show skeleton rows while loading", () => {
-    mockedAxios.get.mockReturnValue(new Promise(() => {}));
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes("/customers")) {
+        return Promise.resolve(mockCustomers());
+      }
+      return new Promise(() => {});
+    });
     renderWithQuery(<TicketsPage />);
 
     expect(screen.getByText("Tickets")).toBeInTheDocument();
@@ -64,7 +89,7 @@ describe("TicketsPage", () => {
   });
 
   it("should display tickets in a table after loading", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -83,7 +108,7 @@ describe("TicketsPage", () => {
   });
 
   it("should display sender name and email", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -96,7 +121,7 @@ describe("TicketsPage", () => {
   });
 
   it("should display status badges", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -108,7 +133,7 @@ describe("TicketsPage", () => {
   });
 
   it("should display category using category labels", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -119,7 +144,7 @@ describe("TicketsPage", () => {
   });
 
   it("should show dash for null category", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -132,7 +157,9 @@ describe("TicketsPage", () => {
   });
 
   it("should format createdAt as a locale date string", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse([mockTickets[0]]));
+    mockedAxios.get.mockImplementation(
+      defaultGetImpl(() => Promise.resolve(mockResponse([mockTickets[0]])))
+    );
     renderWithQuery(<TicketsPage />);
 
     const expectedDate = new Date(
@@ -144,7 +171,12 @@ describe("TicketsPage", () => {
   });
 
   it("should show an error alert when the request fails", async () => {
-    mockedAxios.get.mockRejectedValue(new Error("Network Error"));
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes("/customers")) {
+        return Promise.resolve(mockCustomers());
+      }
+      return Promise.reject(new Error("Network Error"));
+    });
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -155,7 +187,12 @@ describe("TicketsPage", () => {
   });
 
   it("should not show the table when there is an error", async () => {
-    mockedAxios.get.mockRejectedValue(new Error("Network Error"));
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes("/customers")) {
+        return Promise.resolve(mockCustomers());
+      }
+      return Promise.reject(new Error("Network Error"));
+    });
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -168,7 +205,9 @@ describe("TicketsPage", () => {
   });
 
   it("should render an empty table body when there are no tickets", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse([], 0));
+    mockedAxios.get.mockImplementation(
+      defaultGetImpl(() => Promise.resolve(mockResponse([], 0)))
+    );
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -183,7 +222,9 @@ describe("TicketsPage", () => {
   });
 
   it("should call axios.get with default sort and pagination params", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse([], 0));
+    mockedAxios.get.mockImplementation(
+      defaultGetImpl(() => Promise.resolve(mockResponse([], 0)))
+    );
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -200,7 +241,7 @@ describe("TicketsPage", () => {
 
   it("should sort by column when clicking a column header", async () => {
     const user = userEvent.setup();
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -210,7 +251,7 @@ describe("TicketsPage", () => {
     });
 
     mockedAxios.get.mockClear();
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
 
     await user.click(screen.getByRole("button", { name: /Subject/ }));
 
@@ -227,7 +268,7 @@ describe("TicketsPage", () => {
 
   it("should toggle sort order when clicking the same column header twice", async () => {
     const user = userEvent.setup();
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -237,7 +278,7 @@ describe("TicketsPage", () => {
     });
 
     mockedAxios.get.mockClear();
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
 
     await user.click(screen.getByRole("button", { name: /Subject/ }));
 
@@ -251,7 +292,7 @@ describe("TicketsPage", () => {
     });
 
     mockedAxios.get.mockClear();
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
 
     await user.click(screen.getByRole("button", { name: /Subject/ }));
 
@@ -266,19 +307,25 @@ describe("TicketsPage", () => {
   });
 
   it("should render the search input and filter dropdowns", () => {
-    mockedAxios.get.mockReturnValue(new Promise(() => {}));
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes("/customers")) {
+        return Promise.resolve(mockCustomers());
+      }
+      return new Promise(() => {});
+    });
     renderWithQuery(<TicketsPage />);
 
     expect(
-      screen.getByPlaceholderText("Search tickets...")
+      screen.getByPlaceholderText("Search subject, name, or email...")
     ).toBeInTheDocument();
+    expect(screen.getByText("All customers")).toBeInTheDocument();
     expect(screen.getByText("All statuses")).toBeInTheDocument();
     expect(screen.getByText("All categories")).toBeInTheDocument();
   });
 
   it("should send search param when typing in the search input", async () => {
     const user = userEvent.setup();
-    mockedAxios.get.mockResolvedValue(mockResponse());
+    mockedAxios.get.mockImplementation(defaultGetImpl());
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -288,10 +335,12 @@ describe("TicketsPage", () => {
     });
 
     mockedAxios.get.mockClear();
-    mockedAxios.get.mockResolvedValue(mockResponse([mockTickets[0]]));
+    mockedAxios.get.mockImplementation(
+      defaultGetImpl(() => Promise.resolve(mockResponse([mockTickets[0]])))
+    );
 
     await user.type(
-      screen.getByPlaceholderText("Search tickets..."),
+      screen.getByPlaceholderText("Search subject, name, or email..."),
       "login"
     );
 
@@ -336,7 +385,9 @@ describe("TicketsPage", () => {
   });
 
   it("should display pagination info and controls", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse(mockTickets, 50));
+    mockedAxios.get.mockImplementation(
+      defaultGetImpl(() => Promise.resolve(mockResponse(mockTickets, 50)))
+    );
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -358,7 +409,9 @@ describe("TicketsPage", () => {
 
   it("should fetch page 2 when clicking the next page button", async () => {
     const user = userEvent.setup();
-    mockedAxios.get.mockResolvedValue(mockResponse(mockTickets, 50));
+    mockedAxios.get.mockImplementation(
+      defaultGetImpl(() => Promise.resolve(mockResponse(mockTickets, 50)))
+    );
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {
@@ -368,8 +421,13 @@ describe("TicketsPage", () => {
     });
 
     mockedAxios.get.mockClear();
-    mockedAxios.get.mockResolvedValue({
-      data: { tickets: mockTickets, total: 50, page: 2, pageSize: 10 },
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes("/customers")) {
+        return Promise.resolve(mockCustomers());
+      }
+      return Promise.resolve({
+        data: { tickets: mockTickets, total: 50, page: 2, pageSize: 10 },
+      });
     });
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -382,7 +440,9 @@ describe("TicketsPage", () => {
   });
 
   it("should disable all pagination buttons on the last page", async () => {
-    mockedAxios.get.mockResolvedValue(mockResponse(mockTickets, 3));
+    mockedAxios.get.mockImplementation(
+      defaultGetImpl(() => Promise.resolve(mockResponse(mockTickets, 3)))
+    );
     renderWithQuery(<TicketsPage />);
 
     await waitFor(() => {

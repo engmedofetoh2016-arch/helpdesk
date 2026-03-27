@@ -81,9 +81,6 @@ test.describe("Tickets Page", () => {
       const ticket = await createTicketViaWebhook(request, payload);
 
       await loginAsAdmin(page);
-      await page.request.patch(`${API_BASE_URL}/api/tickets/${ticket.id}`, {
-        data: { status: "open" },
-      });
 
       await page.goto("/tickets");
 
@@ -91,7 +88,7 @@ test.describe("Tickets Page", () => {
       await expect(row).toBeVisible();
       await expect(row.getByText(payload.fromName)).toBeVisible();
       await expect(row.getByText(payload.from)).toBeVisible();
-      await expect(row.locator("text=Open").first()).toBeVisible();
+      await expect(row.locator("text=New").first()).toBeVisible();
     });
 
     test("should show newly created ticket after page reload", async ({ page, request }) => {
@@ -101,9 +98,6 @@ test.describe("Tickets Page", () => {
       const uniqueId = `refresh-${Date.now()}`;
       const payload = createTestPayload(uniqueId);
       const ticket = await createTicketViaWebhook(request, payload);
-      await page.request.patch(`${API_BASE_URL}/api/tickets/${ticket.id}`, {
-        data: { status: "open" },
-      });
 
       await page.reload();
 
