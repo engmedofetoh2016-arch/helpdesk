@@ -30,7 +30,11 @@ app.use(
   })
 );
 
-const isProduction = process.env.NODE_ENV === "production";
+// Coolify (and some hosts) set NODE_ENV=automatic at runtime, which overrides
+// the Dockerfile's production default and would skip serving client/dist.
+const isProduction =
+  process.env.NODE_ENV === "production" ||
+  process.env.NODE_ENV === "automatic";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
