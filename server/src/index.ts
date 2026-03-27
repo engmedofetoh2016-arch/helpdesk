@@ -22,7 +22,24 @@ if (!process.env.BETTER_AUTH_SECRET) {
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(helmet());
+// Default Helmet CSP uses script-src 'self' only; our Vite-built index.html
+// includes a small inline script (theme from localStorage) — see client/index.html.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "script-src": ["'self'", "'unsafe-inline'"],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com",
+        ],
+        "font-src": ["'self'", "https://fonts.gstatic.com"],
+      },
+    },
+  })
+);
 app.use(
   cors({
     origin: process.env.TRUSTED_ORIGINS?.split(",") ?? [],
