@@ -2,6 +2,10 @@
 FROM oven/bun:1 AS install
 WORKDIR /app
 
+# Hosts (e.g. Coolify) may inject NODE_ENV at build time, which skips devDependencies
+# and breaks Vite / Prisma during later stages. Force full installs here.
+ENV NODE_ENV=development
+
 COPY package.json bun.lock ./
 COPY client/package.json ./client/
 COPY server/package.json ./server/
@@ -12,6 +16,7 @@ RUN bun install --frozen-lockfile
 # Stage 2: Build
 FROM oven/bun:1 AS build
 WORKDIR /app
+ENV NODE_ENV=development
 
 COPY --from=install /app/node_modules ./node_modules
 
