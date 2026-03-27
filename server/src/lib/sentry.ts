@@ -1,9 +1,12 @@
 import * as Sentry from "@sentry/node";
 
+const sentryDsn = process.env.SENTRY_DSN?.trim();
+const sentryEnabled = Boolean(sentryDsn);
+
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
+  dsn: sentryEnabled ? sentryDsn : undefined,
   environment: process.env.SENTRY_ENVIRONMENT || "development",
-  enabled: !!process.env.SENTRY_DSN,
+  enabled: sentryEnabled,
   tracesSampleRate: 1.0,
 });
 
