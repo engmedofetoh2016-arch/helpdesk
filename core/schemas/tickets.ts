@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { agentTicketStatuses, ticketStatuses } from "../constants/ticket-status";
+import { ticketStatuses } from "../constants/ticket-status";
 import { ticketCategories } from "../constants/ticket-category";
 
 export const inboundEmailSchema = z.object({
@@ -34,7 +34,7 @@ export type TicketSortField = (typeof sortableColumns)[number];
 
 export const updateTicketSchema = z.object({
   assignedToId: z.string().nullable().optional(),
-  status: z.enum(agentTicketStatuses).optional(),
+  status: z.enum(ticketStatuses).optional(),
   category: z.enum(ticketCategories).nullable().optional(),
 });
 
