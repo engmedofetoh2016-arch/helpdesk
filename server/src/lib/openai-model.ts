@@ -1,7 +1,8 @@
 import { createOpenAI } from "@ai-sdk/openai";
 
 /**
- * OpenAI chat model for @ai-sdk/openai. Override with OPENAI_MODEL (e.g. gpt-4o-mini, gpt-4o).
+ * OpenAI chat model for @ai-sdk/openai. Override with OPENAI_MODEL.
+ * Examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-nano (see your org’s model list and rate limits).
  */
 const modelId = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
 
