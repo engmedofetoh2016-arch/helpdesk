@@ -22,6 +22,11 @@ function supportBrandName(): string {
   return process.env.SUPPORT_BRAND_NAME?.trim() || "Mohamed Fetoh";
 }
 
+/** Closing line for acknowledgements and AI sign-off (e.g. "Support Team"). Override with SUPPORT_SIGN_OFF_LINE. */
+function supportSignOffLine(): string {
+  return process.env.SUPPORT_SIGN_OFF_LINE?.trim() || "Support Team";
+}
+
 /** Model sometimes adds punctuation or whitespace; treat as escalation. */
 function isEscalateResponse(text: string): boolean {
   const first = text.trim().split(/\r?\n/)[0]?.trim() ?? "";
@@ -41,24 +46,28 @@ function buildConversationBody(ticket: {
 }
 
 /** Shown when the AI cannot answer from the KB (ESCALATE). Override with ESCALATION_ACK_MESSAGE. */
-function ackEscalateFromKb(firstName: string, brand: string): string {
+function ackEscalateFromKb(firstName: string): string {
   const custom = process.env.ESCALATION_ACK_MESSAGE?.trim();
   if (custom) return custom;
+  const signOff = supportSignOffLine();
   return (
-    `Thanks for your message, ${firstName}. We could not find a complete answer in our help articles for this yet, ` +
-    `so a member of our team will review your request and reply to you directly.\n\n` +
-    `Best regards,\n${brand} Support`
+    `Thank you for contacting us, ${firstName}.\n\n` +
+    `We were unable to find a complete answer in our help articles for your request. ` +
+    `Our support team will review your case and respond to you directly.\n\n` +
+    `Best regards,\n${signOff}`
   );
 }
 
 /** Shown when OpenAI is missing, errors, or quota issues. Override with AUTO_RESOLVE_FAILURE_ACK_MESSAGE. */
-function ackAutoResolveFailed(firstName: string, brand: string): string {
+function ackAutoResolveFailed(firstName: string): string {
   const custom = process.env.AUTO_RESOLVE_FAILURE_ACK_MESSAGE?.trim();
   if (custom) return custom;
+  const signOff = supportSignOffLine();
   return (
-    `Thanks for your message, ${firstName}. We could not process an automatic reply right now, ` +
-    `but we have received your request and a team member will get back to you soon.\n\n` +
-    `Best regards,\n${brand} Support`
+    `Thank you for contacting us, ${firstName}.\n\n` +
+    `We were unable to generate an automated reply at this time. ` +
+    `Your request has been received, and a member of our support team will follow up with you shortly.\n\n` +
+    `Best regards,\n${signOff}`
   );
 }
 
@@ -140,7 +149,7 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
         ticketId,
         subject,
         senderEmail,
-        body: ackAutoResolveFailed(firstName, brand),
+        body: ackAutoResolveFailed(firstName),
       });
       return;
     }
@@ -152,6 +161,7 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
       data: { status: "processing" },
     });
 
+    const signOff = supportSignOffLine();
     let response: string;
     try {
       const { text } = await generateText({
@@ -167,7 +177,7 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
           "- Format the response clearly with line breaks between paragraphs\n" +
           "- Use bullet points or numbered lists when listing steps or multiple items\n" +
           "- End with an offer to help further, e.g. 'If you have any other questions, feel free to reach out.'\n" +
-          `- Sign off with:\n\nBest regards,\n${brand} Support\n\n` +
+          `- Sign off with exactly this closing (two lines):\n\nBest regards,\n${signOff}\n\n` +
           "If the knowledge base does NOT contain enough information to fully resolve the question, " +
           'respond with exactly "ESCALATE" and nothing else.',
         prompt: `Subject: ${subject}\n\nConversation:\n${body}`,
@@ -182,7 +192,7 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
         ticketId,
         subject,
         senderEmail,
-        body: ackAutoResolveFailed(firstName, brand),
+        body: ackAutoResolveFailed(firstName),
       });
       return;
     }
@@ -192,7 +202,7 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
         ticketId,
         subject,
         senderEmail,
-        body: ackEscalateFromKb(firstName, brand),
+        body: ackEscalateFromKb(firstName),
       });
     } else {
       try {

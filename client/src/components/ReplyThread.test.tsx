@@ -81,7 +81,7 @@ describe("ReplyThread", () => {
       expect(screen.getByText("Jane Doe")).toBeInTheDocument();
     });
     expect(screen.getByText("I can help with that")).toBeInTheDocument();
-    expect(screen.getAllByText(/Agent/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Support Team/).length).toBeGreaterThanOrEqual(1);
   });
 
   it("should display customer replies with the ticket sender name", async () => {
@@ -107,7 +107,7 @@ describe("ReplyThread", () => {
     expect(screen.getByText(/Customer/)).toBeInTheDocument();
   });
 
-  it("should fall back to 'Agent' when agent reply has no user", async () => {
+  it("should fall back to 'Support Team' when agent reply has no user", async () => {
     mockedAxios.get.mockResolvedValue({
       data: {
         replies: [
@@ -124,7 +124,7 @@ describe("ReplyThread", () => {
     renderWithQuery(<ReplyThread ticket={mockTicket} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Agent").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Support Team").length).toBeGreaterThanOrEqual(1);
     });
     expect(screen.getByText("Automated response")).toBeInTheDocument();
   });

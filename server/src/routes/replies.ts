@@ -14,6 +14,7 @@ import {
   userMessageForOpenAiFailure,
 } from "../lib/openai-model";
 import { classifyCustomerReplySentiment } from "../lib/sentiment-customer-reply";
+import { senderTypeLabel } from "core/constants/sender-type.ts";
 import { sendAutoResolveJob } from "../lib/auto-resolve-ticket";
 import { AI_AGENT_ID } from "core/constants/ai-agent.ts";
 
@@ -157,7 +158,9 @@ router.post("/summarize", requireAuth, requireAgent, async (req, res) => {
   const conversation = replies
     .map((r) => {
       const sender =
-        r.senderType === "agent" ? (r.user?.name ?? "Agent") : ticket.senderName;
+        r.senderType === "agent"
+          ? (r.user?.name ?? senderTypeLabel.agent)
+          : ticket.senderName;
       return `${sender}: ${r.body}`;
     })
     .join("\n\n");

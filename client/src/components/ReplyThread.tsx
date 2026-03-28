@@ -25,6 +25,9 @@ interface ReplyThreadProps {
 
 export default function ReplyThread({ ticket }: ReplyThreadProps) {
   const { id: ticketId, senderName } = ticket;
+  const agentLabel =
+    (import.meta.env.VITE_SUPPORT_AGENT_LABEL as string | undefined)?.trim() ||
+    senderTypeLabel.agent;
   const { data, isLoading, error } = useQuery({
     queryKey: ["replies", ticketId],
     queryFn: async () => {
@@ -57,7 +60,7 @@ export default function ReplyThread({ ticket }: ReplyThreadProps) {
       {data.replies.map((reply) => {
         const isAgent = reply.senderType === "agent";
         const displayName = isAgent
-          ? reply.user?.name ?? "Agent"
+          ? reply.user?.name ?? agentLabel
           : senderName;
 
         return (
@@ -86,7 +89,7 @@ export default function ReplyThread({ ticket }: ReplyThreadProps) {
                   </CardTitle>
                   <CardDescription className="text-xs flex flex-wrap items-center gap-2">
                     <span>
-                      {senderTypeLabel[reply.senderType]} &middot;{" "}
+                      {(isAgent ? agentLabel : senderTypeLabel.customer)} &middot;{" "}
                       {new Date(reply.createdAt).toLocaleString()}
                     </span>
                     {!isAgent && reply.sentiment && (
