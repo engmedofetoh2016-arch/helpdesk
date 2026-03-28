@@ -46,6 +46,7 @@ export default function ReplyForm({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["replies", ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["ticket", String(ticketId)] });
       reset();
     },
   });

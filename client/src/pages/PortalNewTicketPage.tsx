@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -7,6 +7,7 @@ import {
   customerCreateTicketSchema,
   type CustomerCreateTicketInput,
 } from "core/schemas/tickets.ts";
+import { ticketCategories, categoryLabel } from "core/constants/ticket-category.ts";
 import {
   Card,
   CardContent,
@@ -18,6 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import ErrorAlert from "@/components/ErrorAlert";
 import ErrorMessage from "@/components/ErrorMessage";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -30,6 +38,7 @@ export default function PortalNewTicketPage() {
 
   const {
     register,
+    control,
     handleSubmit,
     getValues,
     setValue,
@@ -37,6 +46,7 @@ export default function PortalNewTicketPage() {
     formState: { errors },
   } = useForm<CustomerCreateTicketInput>({
     resolver: zodResolver(customerCreateTicketSchema),
+    defaultValues: { category: undefined },
   });
 
   const bodyValue = watch("body");
@@ -115,6 +125,38 @@ export default function PortalNewTicketPage() {
               <Label htmlFor="subject">Subject</Label>
               <Input id="subject" {...register("subject")} />
               <ErrorMessage message={errors.subject?.message} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Controller
+                control={control}
+                name="category"
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? "__auto__"}
+                    onValueChange={(v) =>
+                      field.onChange(v === "__auto__" ? undefined : v)
+                    }
+                  >
+                    <SelectTrigger id="category" className="w-full">
+                      <SelectValue placeholder="Choose category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__auto__">Auto-detect (AI)</SelectItem>
+                      {ticketCategories.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {categoryLabel[c]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                Choose a type or use auto-detect so AI picks a category from your
+                message.
+              </p>
+              <ErrorMessage message={errors.category?.message} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="body">Message</Label>

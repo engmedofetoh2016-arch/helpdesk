@@ -1,9 +1,9 @@
-# Code with Mosh -- Support Knowledge Base
+# Support knowledge base
 
 *Last Updated: 2026*
 
 This document contains official support policies and troubleshooting
-guides for Code with Mosh courses.
+guides. Edit `server/knowledge-base.md` for your product or service.
 
 ------------------------------------------------------------------------
 

@@ -15,7 +15,6 @@ import prisma from "../db";
 import type { Prisma } from "../generated/prisma/client";
 import { AI_AGENT_ID } from "core/constants/ai-agent.ts";
 import { sendClassifyJob } from "../lib/classify-ticket";
-import { sendAutoResolveJob } from "../lib/auto-resolve-ticket";
 import { Role } from "core/constants/role.ts";
 import {
   assertOpenAiConfigured,
@@ -139,18 +138,22 @@ router.post("/", requireAuth, async (req, res) => {
         senderName: req.user.name,
         senderEmail: req.user.email,
         assignedToId: AI_AGENT_ID,
+        ...(data.category != null && { category: data.category }),
       },
     });
 
     res.status(201).json(ticket);
 
-    sendClassifyJob(ticket).catch((error) =>
-      console.error(`Failed to enqueue classify job for ticket ${ticket.id}:`, error)
-    );
+    if (data.category == null) {
+      sendClassifyJob(ticket).catch((error) =>
+        console.error(
+          `Failed to enqueue classify job for ticket ${ticket.id}:`,
+          error
+        )
+      );
+    }
 
-    sendAutoResolveJob(ticket).catch((error) =>
-      console.error(`Failed to enqueue auto-resolve job for ticket ${ticket.id}:`, error)
-    );
+    // Portal requests should stay open for staff; auto-resolve would mark many as resolved from the KB.
     return;
   }
 
@@ -174,10 +177,6 @@ router.post("/", requireAuth, async (req, res) => {
 
   sendClassifyJob(ticket).catch((error) =>
     console.error(`Failed to enqueue classify job for ticket ${ticket.id}:`, error)
-  );
-
-  sendAutoResolveJob(ticket).catch((error) =>
-    console.error(`Failed to enqueue auto-resolve job for ticket ${ticket.id}:`, error)
   );
 });
 

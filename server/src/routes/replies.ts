@@ -78,6 +78,13 @@ router.post("/", requireAuth, async (req, res) => {
       include: { user: { select: { id: true, name: true } } },
     });
 
+    if (ticket.status === "resolved" || ticket.status === "closed") {
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { status: "open" },
+      });
+    }
+
     res.status(201).json(reply);
     return;
   }

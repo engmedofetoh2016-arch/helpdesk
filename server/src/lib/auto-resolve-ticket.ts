@@ -14,6 +14,10 @@ const knowledgeBase = fs.readFileSync(
   "utf-8"
 );
 
+function supportBrandName(): string {
+  return process.env.SUPPORT_BRAND_NAME?.trim() || "Mohamed Fetoh";
+}
+
 interface AutoResolveJobData {
   ticketId: number;
   subject: string;
@@ -32,6 +36,7 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
   await boss.work<AutoResolveJobData>(QUEUE_NAME, async (jobs) => {
     const { ticketId, subject, body, senderName, senderEmail } = jobs[0]!.data;
     const firstName = senderName.split(" ")[0];
+    const brand = supportBrandName();
 
     await prisma.ticket.update({
       where: { id: ticketId },
@@ -43,7 +48,7 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
       const { text } = await generateText({
         model: chatModel,
         system:
-          "You are a friendly and professional support agent for Code with Mosh. " +
+          `You are a friendly and professional support agent for ${brand}. ` +
           "Use ONLY the following knowledge base to answer the customer's question.\n\n" +
           knowledgeBase +
           "\n\n" +
@@ -53,7 +58,7 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
           "- Format the response clearly with line breaks between paragraphs\n" +
           "- Use bullet points or numbered lists when listing steps or multiple items\n" +
           "- End with an offer to help further, e.g. 'If you have any other questions, feel free to reach out.'\n" +
-          "- Sign off with:\n\nBest regards,\nCode with Mosh Support\n\n" +
+          `- Sign off with:\n\nBest regards,\n${brand} Support\n\n` +
           "If the knowledge base does NOT contain enough information to fully resolve the question, " +
           'respond with exactly "ESCALATE" and nothing else.',
         prompt: `Subject: ${subject}\n\nBody: ${body}`,

@@ -6,7 +6,6 @@ import { requireWebhookSecret } from "../middleware/require-webhook-secret";
 import { validate } from "../lib/validate";
 import prisma from "../db";
 import { sendClassifyJob } from "../lib/classify-ticket";
-import { sendAutoResolveJob } from "../lib/auto-resolve-ticket";
 import { AI_AGENT_ID } from "core/constants/ai-agent.ts";
 
 const upload = multer();
@@ -44,13 +43,13 @@ router.post("/inbound-email", requireWebhookSecret, upload.any(), async (req, re
 
   const normalizedSubject = stripSubjectPrefixes(data.subject);
 
-  // Check for existing open ticket from same sender with matching subject
+  // Same sender + subject = same thread (including resolved/closed — we reopen on new mail)
   const existingTicket = await prisma.ticket.findFirst({
     where: {
       senderEmail: data.from,
-      status: { notIn: ["resolved", "closed"] },
       subject: { equals: normalizedSubject, mode: "insensitive" },
     },
+    orderBy: { updatedAt: "desc" },
   });
 
   if (existingTicket) {
@@ -63,7 +62,16 @@ router.post("/inbound-email", requireWebhookSecret, upload.any(), async (req, re
         userId: null,
       },
     });
-    res.status(200).json({ ticket: existingTicket });
+    if (existingTicket.status === "resolved" || existingTicket.status === "closed") {
+      await prisma.ticket.update({
+        where: { id: existingTicket.id },
+        data: { status: "open" },
+      });
+    }
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: existingTicket.id },
+    });
+    res.status(200).json({ ticket });
     return;
   }
 
@@ -82,10 +90,6 @@ router.post("/inbound-email", requireWebhookSecret, upload.any(), async (req, re
 
   sendClassifyJob(ticket).catch((error) =>
     console.error(`Failed to enqueue classify job for ticket ${ticket.id}:`, error)
-  );
-
-  sendAutoResolveJob(ticket).catch((error) =>
-    console.error(`Failed to enqueue auto-resolve job for ticket ${ticket.id}:`, error)
   );
 });
 
