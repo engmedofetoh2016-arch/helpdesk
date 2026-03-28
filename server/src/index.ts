@@ -1,3 +1,4 @@
+import "dotenv/config";
 import path from "path";
 import Sentry from "./lib/sentry";
 import express from "express";

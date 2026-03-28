@@ -118,10 +118,12 @@ router.post("/summarize", requireAuth, async (req, res) => {
     });
     text = result.text;
   } catch (e) {
-    console.error("summarize error:", e);
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("summarize error:", detail, e);
     res.status(502).json({
       error:
         "OpenAI request failed. Check OPENAI_API_KEY and OPENAI_MODEL (e.g. gpt-4o-mini).",
+      ...(process.env.NODE_ENV !== "production" && { details: detail }),
     });
     return;
   }
@@ -169,10 +171,12 @@ router.post("/polish", requireAuth, async (req, res) => {
     });
     text = result.text;
   } catch (e) {
-    console.error("polish error:", e);
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("polish error:", detail, e);
     res.status(502).json({
       error:
         "OpenAI request failed. Check OPENAI_API_KEY and OPENAI_MODEL (e.g. gpt-4o-mini).",
+      ...(process.env.NODE_ENV !== "production" && { details: detail }),
     });
     return;
   }
