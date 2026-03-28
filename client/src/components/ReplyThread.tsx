@@ -4,6 +4,7 @@ import axios from "axios";
 import { type Ticket } from "core/constants/ticket.ts";
 import { type SenderType, senderTypeLabel } from "core/constants/sender-type.ts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import ErrorAlert from "@/components/ErrorAlert";
 import { Bot, User } from "lucide-react";
@@ -15,6 +16,7 @@ interface Reply {
   senderType: SenderType;
   user: { id: string; name: string } | null;
   createdAt: string;
+  sentiment?: string | null;
 }
 
 interface ReplyThreadProps {
@@ -82,9 +84,25 @@ export default function ReplyThread({ ticket }: ReplyThreadProps) {
                   <CardTitle className="text-sm font-medium">
                     {displayName}
                   </CardTitle>
-                  <CardDescription className="text-xs">
-                    {senderTypeLabel[reply.senderType]} &middot;{" "}
-                    {new Date(reply.createdAt).toLocaleString()}
+                  <CardDescription className="text-xs flex flex-wrap items-center gap-2">
+                    <span>
+                      {senderTypeLabel[reply.senderType]} &middot;{" "}
+                      {new Date(reply.createdAt).toLocaleString()}
+                    </span>
+                    {!isAgent && reply.sentiment && (
+                      <Badge
+                        variant={
+                          reply.sentiment === "positive"
+                            ? "default"
+                            : reply.sentiment === "negative"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                        className="text-[10px] uppercase tracking-wide"
+                      >
+                        {reply.sentiment}
+                      </Badge>
+                    )}
                   </CardDescription>
                 </div>
               </div>

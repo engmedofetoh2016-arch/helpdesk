@@ -13,6 +13,7 @@ import {
   chatModel,
   userMessageForOpenAiFailure,
 } from "../lib/openai-model";
+import { classifyCustomerReplySentiment } from "../lib/sentiment-customer-reply";
 
 const router = Router({ mergeParams: true });
 
@@ -68,17 +69,26 @@ router.post("/", requireAuth, async (req, res) => {
       return;
     }
 
+    const wasResolvedOrClosed =
+      ticket.status === "resolved" || ticket.status === "closed";
+
+    let sentiment: string | null = null;
+    if (wasResolvedOrClosed) {
+      sentiment = await classifyCustomerReplySentiment(data.body);
+    }
+
     const reply = await prisma.reply.create({
       data: {
         body: data.body,
         senderType: "customer",
         ticketId,
         userId: null,
+        ...(sentiment != null && { sentiment }),
       },
       include: { user: { select: { id: true, name: true } } },
     });
 
-    if (ticket.status === "resolved" || ticket.status === "closed") {
+    if (wasResolvedOrClosed) {
       await prisma.ticket.update({
         where: { id: ticketId },
         data: { status: "open" },

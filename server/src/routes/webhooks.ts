@@ -6,6 +6,8 @@ import { requireWebhookSecret } from "../middleware/require-webhook-secret";
 import { validate } from "../lib/validate";
 import prisma from "../db";
 import { sendClassifyJob } from "../lib/classify-ticket";
+import { sendAutoResolveJob } from "../lib/auto-resolve-ticket";
+import { classifyCustomerReplySentiment } from "../lib/sentiment-customer-reply";
 import { AI_AGENT_ID } from "core/constants/ai-agent.ts";
 
 const upload = multer();
@@ -53,6 +55,15 @@ router.post("/inbound-email", requireWebhookSecret, upload.any(), async (req, re
   });
 
   if (existingTicket) {
+    const wasResolvedOrClosed =
+      existingTicket.status === "resolved" ||
+      existingTicket.status === "closed";
+
+    let sentiment: string | null = null;
+    if (wasResolvedOrClosed) {
+      sentiment = await classifyCustomerReplySentiment(data.body);
+    }
+
     await prisma.reply.create({
       data: {
         body: data.body,
@@ -60,9 +71,10 @@ router.post("/inbound-email", requireWebhookSecret, upload.any(), async (req, re
         senderType: "customer",
         ticketId: existingTicket.id,
         userId: null,
+        ...(sentiment != null && { sentiment }),
       },
     });
-    if (existingTicket.status === "resolved" || existingTicket.status === "closed") {
+    if (wasResolvedOrClosed) {
       await prisma.ticket.update({
         where: { id: existingTicket.id },
         data: { status: "open" },
@@ -90,6 +102,13 @@ router.post("/inbound-email", requireWebhookSecret, upload.any(), async (req, re
 
   sendClassifyJob(ticket).catch((error) =>
     console.error(`Failed to enqueue classify job for ticket ${ticket.id}:`, error)
+  );
+
+  sendAutoResolveJob(ticket).catch((error) =>
+    console.error(
+      `Failed to enqueue auto-resolve job for ticket ${ticket.id}:`,
+      error
+    )
   );
 });
 

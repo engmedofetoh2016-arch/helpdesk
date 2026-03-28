@@ -117,6 +117,8 @@ model Reply {
   userId     String?
   user       User?      @relation(fields: [userId], references: [id])
   createdAt  DateTime   @default(now())
+  /** Customer follow-up only: positive | negative | neutral (AI, after resolved ticket reopens) */
+  sentiment  String?
 
   @@map("reply")
 }

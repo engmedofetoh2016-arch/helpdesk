@@ -1,6 +1,7 @@
 import { PgBoss } from "pg-boss";
 import Sentry from "./sentry";
 import { registerClassifyWorker } from "./classify-ticket";
+import { registerAutoResolveWorker } from "./auto-resolve-ticket";
 import { registerSendEmailWorker } from "./send-email";
 
 const boss = new PgBoss({
@@ -18,6 +19,7 @@ export async function startQueue(): Promise<void> {
   await boss.start();
 
   await registerClassifyWorker(boss);
+  await registerAutoResolveWorker(boss);
   await registerSendEmailWorker(boss);
 
   console.log("Job queue started");
