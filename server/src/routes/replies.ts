@@ -14,6 +14,8 @@ import {
   userMessageForOpenAiFailure,
 } from "../lib/openai-model";
 import { classifyCustomerReplySentiment } from "../lib/sentiment-customer-reply";
+import { sendAutoResolveJob } from "../lib/auto-resolve-ticket";
+import { AI_AGENT_ID } from "core/constants/ai-agent.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -93,6 +95,21 @@ router.post("/", requireAuth, async (req, res) => {
         where: { id: ticketId },
         data: { status: "open" },
       });
+    }
+
+    const afterCustomerReply = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+    });
+    if (
+      afterCustomerReply?.assignedToId === AI_AGENT_ID &&
+      afterCustomerReply.status === "open"
+    ) {
+      sendAutoResolveJob({ id: ticketId }).catch((error) =>
+        console.error(
+          `Failed to enqueue auto-resolve job for ticket ${ticketId}:`,
+          error
+        )
+      );
     }
 
     res.status(201).json(reply);

@@ -84,6 +84,18 @@ router.post("/inbound-email", requireWebhookSecret, upload.any(), async (req, re
       where: { id: existingTicket.id },
     });
     res.status(200).json({ ticket });
+
+    if (
+      ticket?.assignedToId === AI_AGENT_ID &&
+      ticket.status === "open"
+    ) {
+      sendAutoResolveJob({ id: ticket.id }).catch((error) =>
+        console.error(
+          `Failed to enqueue auto-resolve job for ticket ${ticket.id}:`,
+          error
+        )
+      );
+    }
     return;
   }
 
