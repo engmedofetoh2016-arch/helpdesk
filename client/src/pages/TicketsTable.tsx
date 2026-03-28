@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -43,59 +43,72 @@ interface TicketsResponse {
   pageSize: number;
 }
 
-const columns: ColumnDef<Ticket>[] = [
-  {
-    accessorKey: "subject",
-    header: "Subject",
-    cell: ({ row }) => (
-      <Link
-        to={`/tickets/${row.original.id}`}
-        className="link font-medium"
-      >
-        {row.original.subject}
-      </Link>
-    ),
-  },
-  {
-    accessorKey: "senderName",
-    header: "Sender",
-    cell: ({ row }) => (
-      <div>
-        <div>{row.original.senderName}</div>
-        <div className="text-sm text-muted-foreground">
-          {row.original.senderEmail}
-        </div>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => <StatusBadge status={row.original.status} />,
-  },
-  {
-    accessorKey: "category",
-    header: "Category",
-    cell: ({ row }) =>
-      row.original.category ? (
-        <Badge variant="secondary">
-          {categoryLabel[row.original.category]}
-        </Badge>
-      ) : (
-        "—"
-      ),
-  },
-  {
-    accessorKey: "createdAt",
-    header: "Created",
-    cell: ({ row }) =>
-      new Date(row.original.createdAt).toLocaleDateString(),
-  },
-];
-
 const PAGE_SIZE = 10;
 
-export default function TicketsTable({ filters }: { filters: TicketFilters }) {
+function buildColumns(detailBasePath: string): ColumnDef<Ticket>[] {
+  return [
+    {
+      accessorKey: "subject",
+      header: "Subject",
+      cell: ({ row }) => (
+        <Link
+          to={`${detailBasePath}/${row.original.id}`}
+          className="link font-medium"
+        >
+          {row.original.subject}
+        </Link>
+      ),
+    },
+    {
+      accessorKey: "senderName",
+      header: "Sender",
+      cell: ({ row }) => (
+        <div>
+          <div>{row.original.senderName}</div>
+          <div className="text-sm text-muted-foreground">
+            {row.original.senderEmail}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      accessorKey: "category",
+      header: "Category",
+      cell: ({ row }) =>
+        row.original.category ? (
+          <Badge variant="secondary">
+            {categoryLabel[row.original.category]}
+          </Badge>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      accessorKey: "createdAt",
+      header: "Created",
+      cell: ({ row }) =>
+        new Date(row.original.createdAt).toLocaleDateString(),
+    },
+  ];
+}
+
+export default function TicketsTable({
+  filters,
+  detailBasePath = "/tickets",
+}: {
+  filters: TicketFilters;
+  /** e.g. `/portal/tickets` for customer portal */
+  detailBasePath?: string;
+}) {
+  const columns = useMemo(
+    () => buildColumns(detailBasePath),
+    [detailBasePath]
+  );
   const [sorting, setSorting] = useState<SortingState>([
     { id: "createdAt", desc: true },
   ]);

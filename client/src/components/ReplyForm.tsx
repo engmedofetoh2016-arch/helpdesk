@@ -11,9 +11,14 @@ import ErrorMessage from "@/components/ErrorMessage";
 
 interface ReplyFormProps {
   ticket: Ticket;
+  /** `draft` uses `/api/tickets/polish-draft` (customer-friendly). Default: agent polish on thread. */
+  polishMode?: "agent" | "draft";
 }
 
-export default function ReplyForm({ ticket }: ReplyFormProps) {
+export default function ReplyForm({
+  ticket,
+  polishMode = "agent",
+}: ReplyFormProps) {
   const ticketId = ticket.id;
   const queryClient = useQueryClient();
 
@@ -47,10 +52,18 @@ export default function ReplyForm({ ticket }: ReplyFormProps) {
 
   const polishMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await axios.post(`/api/tickets/${ticketId}/replies/polish`, {
-        body: getValues("body"),
-      });
-      return data.body as string;
+      if (polishMode === "draft") {
+        const { data } = await axios.post<{ body: string }>(
+          "/api/tickets/polish-draft",
+          { body: getValues("body") }
+        );
+        return data.body;
+      }
+      const { data } = await axios.post<{ body: string }>(
+        `/api/tickets/${ticketId}/replies/polish`,
+        { body: getValues("body") }
+      );
+      return data.body;
     },
     onSuccess: (polishedText) => {
       setValue("body", polishedText, { shouldValidate: true });
@@ -82,7 +95,11 @@ export default function ReplyForm({ ticket }: ReplyFormProps) {
           disabled={!bodyValue?.trim() || polishMutation.isPending || replyMutation.isPending}
           onClick={() => polishMutation.mutate()}
         >
-          {polishMutation.isPending ? "Polishing..." : "Polish"}
+          {polishMutation.isPending
+            ? "Polishing..."
+            : polishMode === "draft"
+              ? "Polish with AI"
+              : "Polish"}
         </Button>
         <Button type="submit" disabled={!bodyValue?.trim() || replyMutation.isPending || polishMutation.isPending}>
           {replyMutation.isPending ? "Sending..." : "Send Reply"}

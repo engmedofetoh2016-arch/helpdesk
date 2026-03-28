@@ -1,17 +1,27 @@
 import { Router } from "express";
+import { generateText } from "ai";
 import { requireAuth } from "../middleware/require-auth";
+import { requireAgent } from "../middleware/require-agent";
 import { validate } from "../lib/validate";
 import { parseId } from "../lib/parse-id";
 import {
   createTicketSchema,
+  customerCreateTicketSchema,
   ticketListQuerySchema,
   updateTicketSchema,
 } from "core/schemas/tickets.ts";
+import { polishReplySchema } from "core/schemas/replies.ts";
 import prisma from "../db";
 import type { Prisma } from "../generated/prisma/client";
 import { AI_AGENT_ID } from "core/constants/ai-agent.ts";
 import { sendClassifyJob } from "../lib/classify-ticket";
 import { sendAutoResolveJob } from "../lib/auto-resolve-ticket";
+import { Role } from "core/constants/role.ts";
+import {
+  assertOpenAiConfigured,
+  chatModel,
+  userMessageForOpenAiFailure,
+} from "../lib/openai-model";
 
 interface TicketStatsRow {
   totalTickets: bigint;
@@ -23,7 +33,7 @@ interface TicketStatsRow {
 
 const router = Router();
 
-router.get("/stats", requireAuth, async (_req, res) => {
+router.get("/stats", requireAuth, requireAgent, async (_req, res) => {
   const [row] = await prisma.$queryRaw<
     [TicketStatsRow]
   >`SELECT * FROM get_ticket_stats(${AI_AGENT_ID})`;
@@ -37,7 +47,7 @@ router.get("/stats", requireAuth, async (_req, res) => {
   });
 });
 
-router.get("/stats/daily-volume", requireAuth, async (_req, res) => {
+router.get("/stats/daily-volume", requireAuth, requireAgent, async (_req, res) => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
   thirtyDaysAgo.setHours(0, 0, 0, 0);
@@ -70,7 +80,7 @@ function stripSubjectPrefixes(subject: string): string {
   return subject.replace(/^(Re:\s*|Fwd:\s*)+/i, "").trim();
 }
 
-router.get("/customers", requireAuth, async (_req, res) => {
+router.get("/customers", requireAuth, requireAgent, async (_req, res) => {
   const rows = await prisma.ticket.findMany({
     distinct: ["senderEmail"],
     select: { senderEmail: true, senderName: true },
@@ -80,7 +90,70 @@ router.get("/customers", requireAuth, async (_req, res) => {
   res.json({ customers: rows });
 });
 
+router.post("/polish-draft", requireAuth, async (req, res) => {
+  const data = validate(polishReplySchema, req.body, res);
+  if (!data) return;
+
+  const configError = assertOpenAiConfigured();
+  if (configError) {
+    res.status(503).json({ error: configError });
+    return;
+  }
+
+  const system =
+    req.user.role === Role.customer
+      ? "You help customers write clear, polite support requests. Improve clarity, grammar, and tone. " +
+        "Keep the same meaning and facts. Return only the improved text with no preamble."
+      : "You help support staff draft clear customer-facing messages. Improve clarity and tone. " +
+        "Return only the improved text with no preamble.";
+
+  try {
+    const result = await generateText({
+      model: chatModel,
+      system,
+      prompt: data.body,
+    });
+    res.json({ body: result.text });
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("polish-draft error:", detail, e);
+    res.status(502).json({
+      error: userMessageForOpenAiFailure(e),
+      ...(process.env.NODE_ENV !== "production" && { details: detail }),
+    });
+  }
+});
+
 router.post("/", requireAuth, async (req, res) => {
+  if (req.user.role === Role.customer) {
+    const data = validate(customerCreateTicketSchema, req.body, res);
+    if (!data) return;
+
+    const subject = stripSubjectPrefixes(data.subject);
+
+    const ticket = await prisma.ticket.create({
+      data: {
+        subject,
+        body: data.body,
+        bodyHtml: data.bodyHtml ?? null,
+        senderName: req.user.name,
+        senderEmail: req.user.email,
+        assignedToId: AI_AGENT_ID,
+      },
+    });
+
+    res.status(201).json(ticket);
+
+    sendClassifyJob(ticket).catch((error) =>
+      console.error(`Failed to enqueue classify job for ticket ${ticket.id}:`, error)
+    );
+
+    sendAutoResolveJob(ticket).catch((error) =>
+      console.error(`Failed to enqueue auto-resolve job for ticket ${ticket.id}:`, error)
+    );
+    return;
+  }
+
   const data = validate(createTicketSchema, req.body, res);
   if (!data) return;
 
@@ -114,24 +187,40 @@ router.get("/", requireAuth, async (req, res) => {
 
   const where: Prisma.TicketWhereInput = {};
 
-  if (query.status) {
-    where.status = query.status;
-  }
+  if (req.user.role === Role.customer) {
+    where.senderEmail = req.user.email;
+    if (query.status) {
+      where.status = query.status;
+    }
+    if (query.category) {
+      where.category = query.category;
+    }
+    if (query.search) {
+      where.OR = [
+        { subject: { contains: query.search, mode: "insensitive" } },
+        { body: { contains: query.search, mode: "insensitive" } },
+      ];
+    }
+  } else {
+    if (query.status) {
+      where.status = query.status;
+    }
 
-  if (query.senderEmail) {
-    where.senderEmail = query.senderEmail;
-  }
+    if (query.senderEmail) {
+      where.senderEmail = query.senderEmail;
+    }
 
-  if (query.category) {
-    where.category = query.category;
-  }
+    if (query.category) {
+      where.category = query.category;
+    }
 
-  if (query.search) {
-    where.OR = [
-      { subject: { contains: query.search, mode: "insensitive" } },
-      { senderName: { contains: query.search, mode: "insensitive" } },
-      { senderEmail: { contains: query.search, mode: "insensitive" } },
-    ];
+    if (query.search) {
+      where.OR = [
+        { subject: { contains: query.search, mode: "insensitive" } },
+        { senderName: { contains: query.search, mode: "insensitive" } },
+        { senderEmail: { contains: query.search, mode: "insensitive" } },
+      ];
+    }
   }
 
   const [tickets, total] = await Promise.all([
@@ -175,10 +264,15 @@ router.get("/:id", requireAuth, async (req, res) => {
     return;
   }
 
+  if (req.user.role === Role.customer && ticket.senderEmail !== req.user.email) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   res.json(ticket);
 });
 
-router.patch("/:id", requireAuth, async (req, res) => {
+router.patch("/:id", requireAuth, requireAgent, async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) {
     res.status(400).json({ error: "Invalid ticket ID" });

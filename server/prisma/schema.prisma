@@ -16,6 +16,7 @@ datasource db {
 enum Role {
   admin
   agent
+  customer
 }
 
 enum TicketStatus {

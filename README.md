@@ -129,3 +129,26 @@ The app is configured for single-service deployment on Railway. The Express serv
 | `SEED_ADMIN_PASSWORD` | Initial admin user password |
 
 Optional: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`
+
+### Email: inbound tickets and outbound replies
+
+Set these in Coolify (or `server/.env`) so **email creates tickets** and **replies reach the customer’s inbox**.
+
+#### Inbound (mail becomes a ticket)
+
+| Variable | Purpose |
+|----------|---------|
+| `WEBHOOK_SECRET` | Same value SendGrid must send as the `x-webhook-secret` header **or** as `?secret=...` on the URL, e.g. `https://<your-domain>/api/webhooks/inbound-email?secret=...`. Without a match, the webhook is rejected. |
+
+**Also required in SendGrid (not env vars):** Inbound Parse **POST URL** pointing at that path, plus **DNS/MX** (or hostname) so messages land in SendGrid before it POSTs to your app.
+
+#### Outbound (your app sends replies to the customer)
+
+| Variable | Purpose |
+|----------|---------|
+| `SENDGRID_API_KEY` | SendGrid API key for sending mail. |
+| `SENDGRID_FROM_EMAIL` | Verified sender (e.g. `support@yourdomain.com`) in SendGrid. |
+
+The app uses these when an agent sends a reply from the UI (see `server/src/lib/send-email.ts`).
+
+Customers can also submit requests via **`/register`** → **`/portal/new`** without email integration.

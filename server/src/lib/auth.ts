@@ -11,7 +11,21 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    disableSignUp: true,
+    disableSignUp: false,
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          return {
+            data: {
+              ...user,
+              role: Role.customer,
+            },
+          };
+        },
+      },
+    },
   },
   user: {
     additionalFields: {

@@ -9,6 +9,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  Plus,
 } from "lucide-react";
 
 export default function Layout() {
@@ -33,7 +34,7 @@ export default function Layout() {
       <nav className="sticky top-0 z-50 bg-background border-b px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Link
-            to="/"
+            to={session?.user?.role === Role.customer ? "/portal" : "/"}
             className="flex items-center gap-2 mr-5 group"
           >
             <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
@@ -45,19 +46,34 @@ export default function Layout() {
               Helpdesk
             </span>
           </Link>
-          <NavLink to="/" end className={navLinkClass}>
-            <LayoutDashboard className="h-3.5 w-3.5" />
-            Dashboard
-          </NavLink>
-          <NavLink to="/tickets" className={navLinkClass}>
-            <Ticket className="h-3.5 w-3.5" />
-            Tickets
-          </NavLink>
-          {session?.user?.role === Role.admin && (
-            <NavLink to="/users" className={navLinkClass}>
-              <Users className="h-3.5 w-3.5" />
-              Users
-            </NavLink>
+          {session?.user?.role === Role.customer ? (
+            <>
+              <NavLink to="/portal" end className={navLinkClass}>
+                <Ticket className="h-3.5 w-3.5" />
+                My requests
+              </NavLink>
+              <NavLink to="/portal/new" className={navLinkClass}>
+                <Plus className="h-3.5 w-3.5" />
+                New request
+              </NavLink>
+            </>
+          ) : (
+            <>
+              <NavLink to="/" end className={navLinkClass}>
+                <LayoutDashboard className="h-3.5 w-3.5" />
+                Dashboard
+              </NavLink>
+              <NavLink to="/tickets" className={navLinkClass}>
+                <Ticket className="h-3.5 w-3.5" />
+                Tickets
+              </NavLink>
+              {session?.user?.role === Role.admin && (
+                <NavLink to="/users" className={navLinkClass}>
+                  <Users className="h-3.5 w-3.5" />
+                  Users
+                </NavLink>
+              )}
+            </>
           )}
         </div>
         <div className="flex items-center gap-1">

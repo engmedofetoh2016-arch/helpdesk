@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/require-auth";
+import { requireAgent } from "../middleware/require-agent";
 import { validate } from "../lib/validate";
 import { parseId } from "../lib/parse-id";
 import { generateText } from "ai";
 import { createReplySchema, polishReplySchema } from "core/schemas/replies.ts";
+import { Role } from "core/constants/role.ts";
 import prisma from "../db";
 import { sendEmailJob } from "../lib/send-email";
 import {
@@ -24,6 +26,14 @@ router.get("/", requireAuth, async (req, res) => {
   const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
   if (!ticket) {
     res.status(404).json({ error: "Ticket not found" });
+    return;
+  }
+
+  if (
+    req.user.role === Role.customer &&
+    ticket.senderEmail !== req.user.email
+  ) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -52,6 +62,26 @@ router.post("/", requireAuth, async (req, res) => {
     return;
   }
 
+  if (req.user.role === Role.customer) {
+    if (ticket.senderEmail !== req.user.email) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const reply = await prisma.reply.create({
+      data: {
+        body: data.body,
+        senderType: "customer",
+        ticketId,
+        userId: null,
+      },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    res.status(201).json(reply);
+    return;
+  }
+
   const reply = await prisma.reply.create({
     data: {
       body: data.body,
@@ -71,7 +101,7 @@ router.post("/", requireAuth, async (req, res) => {
   res.status(201).json(reply);
 });
 
-router.post("/summarize", requireAuth, async (req, res) => {
+router.post("/summarize", requireAuth, requireAgent, async (req, res) => {
   const ticketId = parseId(req.params.ticketId);
   if (!ticketId) {
     res.status(400).json({ error: "Invalid ticket ID" });
@@ -131,7 +161,7 @@ router.post("/summarize", requireAuth, async (req, res) => {
   res.json({ summary: text });
 });
 
-router.post("/polish", requireAuth, async (req, res) => {
+router.post("/polish", requireAuth, requireAgent, async (req, res) => {
   const ticketId = parseId(req.params.ticketId);
   if (!ticketId) {
     res.status(400).json({ error: "Invalid ticket ID" });

@@ -22,6 +22,15 @@ export const createTicketSchema = z.object({
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 
+/** Self-service portal: identity comes from the session, not the body. */
+export const customerCreateTicketSchema = z.object({
+  subject: z.string().trim().min(1, "Subject is required").max(255, "Subject is too long"),
+  body: z.string().min(1, "Message is required").max(20000, "Message is too long"),
+  bodyHtml: z.string().max(50000).optional(),
+});
+
+export type CustomerCreateTicketInput = z.infer<typeof customerCreateTicketSchema>;
+
 const sortableColumns = [
   "subject",
   "senderName",

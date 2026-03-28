@@ -3,9 +3,8 @@ import { Link, Navigate, useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import axios from "axios";
 import { Role } from "core/constants/role.ts";
-import { signIn, useSession } from "@/lib/auth-client";
+import { signUp, useSession } from "@/lib/auth-client";
 import {
   Card,
   CardContent,
@@ -20,14 +19,15 @@ import ErrorAlert from "@/components/ErrorAlert";
 import ErrorMessage from "@/components/ErrorMessage";
 import { Loader2 } from "lucide-react";
 
-const loginSchema = z.object({
+const registerSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
   email: z.email("Please enter a valid email"),
-  password: z.string().min(1, "Password is required"),
+  password: z.string().min(8, "Use at least 8 characters"),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type RegisterFormData = z.infer<typeof registerSchema>;
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const { data: session, isPending } = useSession();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState("");
@@ -36,8 +36,8 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
   });
 
   if (isPending) {
@@ -50,27 +50,29 @@ export default function LoginPage() {
   }
 
   if (session) {
-    return <Navigate to="/" replace />;
+    return (
+      <Navigate
+        to={session.user.role === Role.customer ? "/portal" : "/"}
+        replace
+      />
+    );
   }
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: RegisterFormData) => {
     setServerError("");
 
-    const result = await signIn.email(data);
+    const { error } = await signUp.email({
+      email: data.email,
+      password: data.password,
+      name: data.name,
+    });
 
-    if (result.error) {
-      setServerError(result.error.message ?? "Login failed");
+    if (error) {
+      setServerError(error.message ?? "Registration failed");
       return;
     }
 
-    const { data: me } = await axios.get<{ user: { role: string } }>(
-      "/api/me"
-    );
-    if (me.user.role === Role.customer) {
-      navigate("/portal", { replace: true });
-      return;
-    }
-    navigate("/", { replace: true });
+    navigate("/portal", { replace: true });
   };
 
   return (
@@ -81,17 +83,18 @@ export default function LoginPage() {
             <span className="text-primary-foreground font-bold text-xl">H</span>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome back
+            Create a customer account
           </h1>
-          <p className="text-muted-foreground text-sm mt-1.5">
-            Sign in to your helpdesk account
+          <p className="text-muted-foreground text-sm mt-1.5 text-center">
+            Submit and track support requests. Staff sign-in uses the same page
+            with an existing account.
           </p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
+            <CardTitle>Register</CardTitle>
             <CardDescription>
-              Enter your credentials to continue
+              You will only see tickets for your email address.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -101,11 +104,18 @@ export default function LoginPage() {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-2">
+                  <Label htmlFor="name">Your name</Label>
+                  <Input id="name" {...register("name")} />
+                  {errors.name && (
+                    <ErrorMessage message={errors.name.message} />
+                  )}
+                </div>
+                <div className="grid gap-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@example.com"
+                    autoComplete="email"
                     {...register("email")}
                   />
                   {errors.email && (
@@ -117,30 +127,23 @@ export default function LoginPage() {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Enter your password"
+                    autoComplete="new-password"
                     {...register("password")}
                   />
                   {errors.password && (
                     <ErrorMessage message={errors.password.message} />
                   )}
                 </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isSubmitting}
-                >
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && (
                     <Loader2 className="animate-spin mr-2 h-4 w-4" />
                   )}
-                  {isSubmitting ? "Signing in..." : "Sign in"}
+                  {isSubmitting ? "Creating account..." : "Create account"}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center">
-                  Need to submit a request?{" "}
-                  <Link
-                    to="/register"
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
-                    Create a customer account
+                  Already have an account?{" "}
+                  <Link to="/login" className="text-primary underline-offset-4 hover:underline">
+                    Sign in
                   </Link>
                 </p>
               </div>
