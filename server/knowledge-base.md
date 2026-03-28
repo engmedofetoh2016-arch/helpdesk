@@ -138,7 +138,15 @@ Proof of purchase (if requested)
 
 ------------------------------------------------------------------------
 
-## 10. Escalation Rules (Internal Policy)
+## 10. General issues & follow-up
+
+### Q: My issue is not listed here, or I need help with something specific.
+
+We take every request seriously. **We will investigate your issue and get back to you as soon as possible (ASAP).** In the meantime, please include any order numbers, screenshots, or error messages so we can help you faster.
+
+------------------------------------------------------------------------
+
+## 11. Escalation Rules (Internal Policy)
 
 The system must escalate to a human agent if: - The user threatens legal
 action. - The user requests a refund outside the 30-day window. - The

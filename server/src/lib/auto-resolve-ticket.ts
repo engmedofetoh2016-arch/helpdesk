@@ -40,6 +40,60 @@ function buildConversationBody(ticket: {
   return parts.join("\n\n");
 }
 
+/** Shown when the AI cannot answer from the KB (ESCALATE). Override with ESCALATION_ACK_MESSAGE. */
+function ackEscalateFromKb(firstName: string, brand: string): string {
+  const custom = process.env.ESCALATION_ACK_MESSAGE?.trim();
+  if (custom) return custom;
+  return (
+    `Thanks for your message, ${firstName}. We could not find a complete answer in our help articles for this yet, ` +
+    `so a member of our team will review your request and reply to you directly.\n\n` +
+    `Best regards,\n${brand} Support`
+  );
+}
+
+/** Shown when OpenAI is missing, errors, or quota issues. Override with AUTO_RESOLVE_FAILURE_ACK_MESSAGE. */
+function ackAutoResolveFailed(firstName: string, brand: string): string {
+  const custom = process.env.AUTO_RESOLVE_FAILURE_ACK_MESSAGE?.trim();
+  if (custom) return custom;
+  return (
+    `Thanks for your message, ${firstName}. We could not process an automatic reply right now, ` +
+    `but we have received your request and a team member will get back to you soon.\n\n` +
+    `Best regards,\n${brand} Support`
+  );
+}
+
+async function postAgentAckReply(params: {
+  ticketId: number;
+  subject: string;
+  senderEmail: string;
+  body: string;
+}): Promise<void> {
+  const { ticketId, subject, senderEmail, body } = params;
+  await prisma.$transaction([
+    prisma.reply.create({
+      data: {
+        body,
+        senderType: "agent",
+        ticketId,
+        userId: null,
+      },
+    }),
+    prisma.ticket.update({
+      where: { id: ticketId },
+      data: { status: "open", assignedToId: null },
+    }),
+  ]);
+  try {
+    await sendEmailJob({
+      to: senderEmail,
+      subject: `Re: ${subject}`,
+      body,
+    });
+  } catch (e) {
+    console.error(`Escalation ack email enqueue failed for ticket ${ticketId}:`, e);
+  }
+}
+
 interface AutoResolveJobData {
   ticketId: number;
 }
@@ -75,19 +129,22 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
       return;
     }
 
+    const { subject, senderName, senderEmail } = ticket;
+    const firstName = senderName.split(" ")[0];
+    const brand = supportBrandName();
+
     const configError = assertOpenAiConfigured();
     if (configError) {
       console.error(`Auto-resolve: ${configError} (ticket ${ticketId})`);
-      await prisma.ticket.update({
-        where: { id: ticketId },
-        data: { status: "open", assignedToId: null },
+      await postAgentAckReply({
+        ticketId,
+        subject,
+        senderEmail,
+        body: ackAutoResolveFailed(firstName, brand),
       });
       return;
     }
 
-    const { subject, senderName, senderEmail } = ticket;
-    const firstName = senderName.split(" ")[0];
-    const brand = supportBrandName();
     const body = buildConversationBody(ticket);
 
     await prisma.ticket.update({
@@ -121,17 +178,21 @@ export async function registerAutoResolveWorker(boss: PgBoss): Promise<void> {
         tags: { queue: QUEUE_NAME, ticketId },
       });
       console.error(`Auto-resolve AI call failed for ticket ${ticketId}:`, error);
-      await prisma.ticket.update({
-        where: { id: ticketId },
-        data: { status: "open", assignedToId: null },
+      await postAgentAckReply({
+        ticketId,
+        subject,
+        senderEmail,
+        body: ackAutoResolveFailed(firstName, brand),
       });
       return;
     }
 
     if (isEscalateResponse(response)) {
-      await prisma.ticket.update({
-        where: { id: ticketId },
-        data: { status: "open", assignedToId: null },
+      await postAgentAckReply({
+        ticketId,
+        subject,
+        senderEmail,
+        body: ackEscalateFromKb(firstName, brand),
       });
     } else {
       try {
